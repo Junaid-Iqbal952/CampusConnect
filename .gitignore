@@ -1,0 +1,15 @@
+# Secrets
+.env
+backend/.env
+
+# Python stuff
+__pycache__/
+*.pyc
+venv/
+
+#VS Code Settings
+.vscode/
+
+#Flutter stuff
+frontend/.dart_tool/
+frontend/build/
