@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'signup_screen.dart';
 import 'styles.dart';
-
+import 'forgot_password_screen.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
@@ -97,7 +97,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final didReset = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      if (didReset == true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Password reset complete. Log in with your new password.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
                     style: TextButton.styleFrom(padding: EdgeInsets.zero),
                     child: const Text(
                       "Forgot Password?",
