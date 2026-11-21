@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'api_service.dart';
+import 'auth_session.dart';
+import 'auth_validators.dart';
 import 'signup_screen.dart';
 import 'styles.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  /// Tests pass a fake AuthApi; the real app uses the default one.
+  final AuthApi? api;
+  const LoginScreen({Key? key, this.api}) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -14,6 +19,51 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
+  late final AuthApi _api = widget.api ?? AuthApi();
+
+  @override
+  void dispose() {
+    _identifierController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // SCRUM-8: log in with ERP (or email) + password.
+  // SCRUM-9: show the error and clear both fields if credentials are wrong.
+  Future<void> _login() async {
+    final identifier = _identifierController.text.trim();
+    final password = _passwordController.text;
+
+    if (identifier.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = AuthMessages.fillAllFields);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await _api.login(identifier: identifier, password: password);
+      if (!mounted) return;
+      await saveSessionAndGoHome(context, result);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+        // FR-1.5: clear both fields on wrong credentials.
+        if (e.message == AuthMessages.wrongCredentials) {
+          _identifierController.clear();
+          _passwordController.clear();
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('login_identifier'),
                   controller: _identifierController,
                   decoration: InputDecoration(
                     labelText: "ERP or Email",
@@ -60,7 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('login_password'),
                   controller: _passwordController,
+                  onSubmitted: (_) => _isLoading ? null : _login(),
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: "Password",
@@ -108,13 +161,23 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
+              AuthErrorText(_errorMessage),
+
               // Login Button
               ElevatedButton(
+                key: const Key('login_button'),
                 style: AppStyles.primaryButtonStyle,
-                onPressed: () {
-                  print("Login button clicked");
-                },
-                child: const Text("LOGIN", style: TextStyle(fontSize: 16)),
+                onPressed: _isLoading ? null : _login,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text("LOGIN", style: TextStyle(fontSize: 16)),
               ),
               const SizedBox(height: 10),
 

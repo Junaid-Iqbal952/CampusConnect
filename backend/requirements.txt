@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-dotenv
+bcrypt
+PyJWT
+# for running tests
+pytest
+httpx
+psycopg[binary]

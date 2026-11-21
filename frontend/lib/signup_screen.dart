@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'api_service.dart';
+import 'auth_session.dart';
+import 'auth_validators.dart';
 import 'login_screen.dart';
 import 'styles.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  /// Tests pass a fake AuthApi; the real app uses the default one.
+  final AuthApi? api;
+  const SignupScreen({Key? key, this.api}) : super(key: key);
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -20,6 +25,86 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
+  late final AuthApi _api = widget.api ?? AuthApi();
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _erpController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _showError(String message) => setState(() => _errorMessage = message);
+
+  // Sign up with name, ERP, IBA email + password (SCRUM-7).
+  Future<void> _createAccount() async {
+    final name = _fullNameController.text;
+    final erp = _erpController.text;
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+
+    // Check the fields top to bottom and stop at the first problem.
+    final nameError = AuthValidators.name(name);
+    if (nameError != null) {
+      _showError(nameError);
+      return;
+    }
+
+    final erpError = AuthValidators.erp(erp);
+    if (erpError != null) {
+      _showError(erpError);
+      return;
+    }
+
+    final emailError = AuthValidators.ibaEmail(email);
+    if (emailError != null) {
+      _emailController.clear(); // FR-1.1: clear the email field
+      _showError(emailError);
+      return;
+    }
+
+    final passwordError = AuthValidators.password(password);
+    if (passwordError != null) {
+      _showError(passwordError);
+      return;
+    }
+
+    final confirmError = AuthValidators.confirmPassword(password, confirm);
+    if (confirmError != null) {
+      _passwordController.clear(); // FR-1.2: clear both password fields
+      _confirmPasswordController.clear();
+      _showError(confirmError);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await _api.signup(
+        name: name,
+        erp: erp,
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      // TODO (SCRUM-6/10/11): go to the email-code screen here instead, once it exists.
+      await saveSessionAndGoHome(context, result);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      _showError(e.message); // e.g. "An account with this ERP already exists"
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +129,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('signup_fullName'),
                   controller: _fullNameController,
                   decoration: InputDecoration(
                     labelText: "Full Name",
@@ -64,6 +150,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('signup_erp'),
                   controller: _erpController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
@@ -85,6 +172,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('signup_email'),
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
@@ -107,6 +195,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('signup_password'),
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
@@ -140,6 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: 400,
                 child: TextField(
+                  key: const Key('signup_confirmPassword'),
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
                   decoration: InputDecoration(
@@ -169,19 +259,29 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 30),
 
+              AuthErrorText(_errorMessage),
+
               // 8. Create Account Button
               SizedBox(
                 width: 200,
                 height: 40,
                 child: ElevatedButton(
+                  key: const Key('signup_button'),
                   style: AppStyles.primaryButtonStyle,
-                  onPressed: () {
-                    print("Create Account button clicked");
-                  },
-                  child: const Text(
-                    "CREATE ACCOUNT",
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  onPressed: _isLoading ? null : _createAccount,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          "CREATE ACCOUNT",
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
               const SizedBox(height: 15),
