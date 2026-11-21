@@ -1,18 +1,30 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'styles.dart';
-// One screen used in 2 places: forgot password and change password.
-// For Change Password (from the hamburger menu), pass isChangePassword: true.
+
+// Use http://10.0.2.2:8000 for Android Emulator, or http://127.0.0.1:8000 for Windows/Web/iOS Simulator
+const String _kBaseUrl = 'http://127.0.0.1:8000';
 
 class ResetPasswordScreen extends StatefulWidget {
   final bool isChangePassword;
+  final String? email;
+  final String? code;
 
-  const ResetPasswordScreen({super.key, this.isChangePassword = false});
+  const ResetPasswordScreen({
+    super.key,
+    this.isChangePassword = false,
+    this.email,
+    this.code,
+  });
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  late final TextEditingController _emailController;
+  late final TextEditingController _codeController;
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -20,17 +32,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _hideCurrent = true;
   bool _hideNew = true;
   bool _hideConfirm = true;
+  bool _isLoading = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.email ?? '');
+    _codeController = TextEditingController(text: widget.code ?? '');
+  }
+
+  @override
   void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
     _currentController.dispose();
     _newController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     final newPass = _newController.text;
     final confirmPass = _confirmController.text;
 
@@ -46,10 +68,72 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return;
     }
 
-    setState(() => _error = null);
+    if (!widget.isChangePassword) {
+      if (_emailController.text.trim().isEmpty) {
+        setState(() => _error = 'Please enter your email address');
+        return;
+      }
+      if (_codeController.text.trim().isEmpty) {
+        setState(() => _error = 'Please enter the 6-digit verification code');
+        return;
+      }
+    }
 
-    // TODO: call the backend here to save the new password.
-    // If isChangePassword is true, send _currentController.text too.
+    setState(() {
+      _error = null;
+      _isLoading = true;
+    });
+
+    try {
+      http.Response response;
+
+      if (widget.isChangePassword) {
+        // Adjust path/body if your change-password endpoint uses a different route
+        final uri = Uri.parse('$_kBaseUrl/auth/change-password');
+        response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'current_password': _currentController.text,
+            'new_password': newPass,
+          }),
+        );
+      } else {
+        final uri = Uri.parse('$_kBaseUrl/auth/reset-password').replace(
+          queryParameters: {
+            'email': _emailController.text.trim(),
+            'code': _codeController.text.trim(),
+            'new_password': newPass,
+          },
+        );
+        response = await http.post(uri, headers: {'accept': 'application/json'});
+      }
+
+      if (!mounted) return;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        String message = 'Failed to update password (${response.statusCode})';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['detail'] != null) {
+            message = decoded['detail'].toString();
+          }
+        } catch (_) {}
+        setState(() => _error = message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not reach server. Check if backend is running.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Widget _passwordField({
@@ -80,8 +164,35 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 
+  Widget _infoField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        hintText: label,
+        prefixIcon: Icon(icon),
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(40),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(40),
+          borderSide: const BorderSide(color: AppStyles.primaryColor, width: 2),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showResetFields =
+        !widget.isChangePassword && (widget.email == null || widget.code == null);
+
     return Scaffold(
       backgroundColor: AppStyles.backgroundColor,
       appBar: AppBar(
@@ -116,6 +227,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         setState(() => _hideCurrent = !_hideCurrent),
                   ),
                   const SizedBox(height: 20),
+                ] else if (showResetFields) ...[
+                  _infoField(
+                    label: 'Email address',
+                    controller: _emailController,
+                    icon: Icons.email,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 20),
+                  _infoField(
+                    label: '6-digit code',
+                    controller: _codeController,
+                    icon: Icons.verified_user,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
                 ],
                 _passwordField(
                   label: 'New password',
@@ -136,16 +262,23 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   Text(
                     _error!,
                     style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
                   ),
                 ],
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: _save,
+                  onPressed: _isLoading ? null : _save,
                   style: AppStyles.primaryButtonStyle,
-                  child: const Text(
-                    'SAVE PASSWORD',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'SAVE PASSWORD',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ],
             ),
