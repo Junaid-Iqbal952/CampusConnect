@@ -1,20 +1,31 @@
-from fastapi import FastAPI, HTTPException
-from database import engine
-from sqlalchemy import text
 import random
 from datetime import datetime, timedelta
 
-app = FastAPI()
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+from auth import router as auth_router
+from database import engine
+from security import hash_password
+
+app = FastAPI(title="CampusConnect API")
+
+# The Flutter WEB app runs on a different port than this API, so the browser
+# needs CORS permission. "*" is fine for development; restrict before deploying.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For local development; restrict to specific origins in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Sign up + log in (SCRUM-7, 8, 9) live in auth.py
+app.include_router(auth_router)
+
+
+# test database connection
 @app.get("/")
 def read_root():
     try:
@@ -24,6 +35,8 @@ def read_root():
     except Exception as e:
         return {"message": f"Error connecting to database: {str(e)}"}
 
+
+# ---------- Forgot password (SCRUM-6/10/11) ----------
 
 @app.post("/auth/request-reset")
 def request_reset(email: str):
@@ -130,7 +143,7 @@ def reset_password(email: str, code: str, new_password: str):
         # 4. Update password in database
         connection.execute(
             text("UPDATE users SET passwordhash = :passwordhash WHERE userid = :userid"),
-            {"passwordhash": new_password, "userid": userid}
+            {"passwordhash": hash_password(new_password), "userid": userid}
         )
 
         # 5. Delete the used code so it cannot be reused

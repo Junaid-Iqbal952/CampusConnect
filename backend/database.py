@@ -12,3 +12,12 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 # Create the engine with NullPool for the Transaction pooler
 engine = create_engine(SQLALCHEMY_DATABASE_URL, poolclass=NullPool)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    """Give each request its own DB session and always close it afterwards."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
