@@ -13,3 +13,4 @@ venv/
 #Flutter stuff
 frontend/.dart_tool/
 frontend/build/
+*.zip
