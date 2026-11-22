@@ -8,6 +8,7 @@ from sqlalchemy import text
 from auth import router as auth_router
 from database import engine
 from security import hash_password
+from listings import router as listings_router
 
 app = FastAPI(title="CampusConnect API")
 
@@ -23,6 +24,7 @@ app.add_middleware(
 
 # Sign up + log in (SCRUM-7, 8, 9) live in auth.py
 app.include_router(auth_router)
+app.include_router(listings_router)
 
 
 # test database connection
