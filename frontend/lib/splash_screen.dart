@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_service.dart';
+import 'auth_session.dart';
 import 'styles.dart';
 import 'temp_home_screen.dart';
 import 'welcome_screen.dart';
@@ -22,26 +24,42 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkLogin() async {
     await Future.delayed(const Duration(seconds: 2));
 
-    // Open the phone/browser's small saved storage.
+    // Open the browser's small saved storage and look for a saved token.
     final prefs = await SharedPreferences.getInstance();
-    //await prefs.setString('auth_token', 'fake-token');
-
-    // Look for a saved token. It is null if nothing was saved.
     final token = prefs.getString('auth_token');
 
     // If this screen was already closed while we waited, stop here.
     if (!mounted) return;
 
-    // Token found -> temporary home page (will be replaced by listings page).
-    // No token -> welcome page.
-    final Widget nextScreen = (token != null && token.isNotEmpty)
-        ? const TempHomeScreen()
-        : const WelcomeScreen();
+    // No saved token -> Welcome page.
+    if (token == null || token.isEmpty) {
+      _go(const WelcomeScreen());
+      return;
+    }
 
-    // pushReplacement removes the splash screen, so Back can't return to it.
+    // Saved token -> ask the server if it is still good.
+    try {
+      await AuthApi().checkSession(token);
+    } on SessionExpiredException catch (e) {
+      // Token expired, or another device logged in.
+      // Wipe the saved login and show the reason on the Welcome page.
+      if (!mounted) return;
+      await clearSessionAndGoToWelcome(context, message: e.message);
+      return;
+    } catch (_) {
+      // Server not reachable (no internet, backend off).
+      // Stay logged in, because staying logged in shouldn't need internet.
+    }
+
+    if (!mounted) return;
+    _go(const TempHomeScreen());
+  }
+
+  // pushReplacement removes the splash screen, so Back can't return to it.
+  void _go(Widget screen) {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => nextScreen),
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'auth_session.dart';
+import 'change_OR_reset_pw.dart';
 import 'styles.dart';
-import 'welcome_screen.dart';
 
-// TEMPORARY page for in place of listings page. needed for token.
-// will be deleted when the real listings page is built
+// TEMPORARY page in place of the listings page. Delete when the real one is built.
 class TempHomeScreen extends StatelessWidget {
   const TempHomeScreen({super.key});
 
@@ -21,20 +20,18 @@ class TempHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton(
               style: AppStyles.primaryButtonStyle,
-              onPressed: () async {
-                // Delete the saved token.
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('auth_token');
-
-                if (!context.mounted) return;
-
-                // Go to Welcome and clear all old screens from history.
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-                  (route) => false,
-                );
-              },
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ResetPasswordScreen(isChangePassword: true),
+                ),
+              ),
+              child: const Text("CHANGE PASSWORD"),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              style: AppStyles.primaryButtonStyle,
+              onPressed: () => logoutAndGoToWelcome(context),
               child: const Text("LOGOUT"),
             ),
           ],

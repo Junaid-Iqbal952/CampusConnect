@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'auth_validators.dart';
+import 'device_id.dart';
 
 /// Where the FastAPI backend runs.
 /// - Flutter web / desktop on the same laptop: http://127.0.0.1:8000 (default)
@@ -19,6 +20,11 @@ class AuthException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Thrown when the server says 401 (token no longer valid).
+class SessionExpiredException extends AuthException {
+  SessionExpiredException(super.message);
 }
 
 class AuthResult {
@@ -58,12 +64,13 @@ class AuthApi {
 
   Future<AuthResult> _post(String path, Map<String, String> body) async {
     final http.Response res;
+    final deviceId = await getDeviceId();
     try {
       res = await _client
           .post(
             Uri.parse('$apiBaseUrl$path'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
+            body: jsonEncode({...body, 'device_id': deviceId}),
           )
           .timeout(const Duration(seconds: 15));
     } catch (_) {
@@ -93,5 +100,36 @@ class AuthApi {
     } catch (_) {
       return {};
     }
+  }
+
+    /// Asks the server: is this saved token still valid?
+  /// Returns normally if yes. Throws SessionExpiredException on 401.
+  Future<void> checkSession(String token) async {
+    final http.Response res;
+    try {
+      res = await _client
+          .get(Uri.parse('$apiBaseUrl/auth/me'),
+              headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      throw AuthException(AuthMessages.serverUnreachable);
+    }
+    if (res.statusCode == 200) return;
+    if (res.statusCode == 401) {
+      final detail = _decode(res.body)['detail'];
+      throw SessionExpiredException(
+          detail is String ? detail : 'Session expired. Please log in again');
+    }
+    throw AuthException('Something went wrong (${res.statusCode})');
+  }
+
+  /// Tells the server we logged out. Errors are ignored on purpose.
+  Future<void> logout(String token) async {
+    try {
+      await _client
+          .post(Uri.parse('$apiBaseUrl/auth/logout'),
+              headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
   }
 }

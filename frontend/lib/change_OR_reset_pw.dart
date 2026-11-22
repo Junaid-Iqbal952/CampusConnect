@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'styles.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_session.dart';
 
 // Use http://10.0.2.2:8000 for Android Emulator, or http://127.0.0.1:8000 for Windows/Web/iOS Simulator
 const String _kBaseUrl = 'http://127.0.0.1:8000';
@@ -62,6 +64,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
 
     if (newPass != confirmPass) {
+      FocusScope.of(context).unfocus();
       _newController.clear();
       _confirmController.clear();
       setState(() => _error = "Passwords don't match");
@@ -87,12 +90,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     try {
       http.Response response;
 
-      if (widget.isChangePassword) {
-        // Adjust path/body if your change-password endpoint uses a different route
+            if (widget.isChangePassword) {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
         final uri = Uri.parse('$_kBaseUrl/auth/change-password');
         response = await http.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',     // proves who we are
+          },
           body: jsonEncode({
             'current_password': _currentController.text,
             'new_password': newPass,
@@ -110,6 +117,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       }
 
       if (!mounted) return;
+
+            // 401 = token no longer valid (expired, or logged in on another device).
+      if (response.statusCode == 401 && widget.isChangePassword) {
+        var msg = 'Session expired. Please log in again';
+        try {
+          msg = jsonDecode(response.body)['detail'].toString();
+        } catch (_) {}
+        await clearSessionAndGoToWelcome(context, message: msg);
+        return;
+      }
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -145,6 +162,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return TextField(
       controller: controller,
       obscureText: hidden,
+      enableSuggestions: false,   // stops the browser's suggestions popup
+      autocorrect: false,
       decoration: InputDecoration(
         hintText: label,
         prefixIcon: const Icon(Icons.lock),
