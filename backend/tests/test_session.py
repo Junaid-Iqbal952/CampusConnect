@@ -53,7 +53,7 @@ def test_logout_stops_the_token(client, registered_user):
 def test_change_password_success(client, registered_user):
     token = login(client, "device-A")
     res = client.post("/auth/change-password", headers=auth(token), json={
-        "current_password": VALID_USER["password"], "new_password": "brandnew123"})
+        "erp": VALID_USER["erp"], "current_password": VALID_USER["password"], "new_password": "brandnew123"})
     assert res.status_code == 200
     old = client.post("/auth/login", json={"identifier": VALID_USER["erp"],
                       "password": VALID_USER["password"], "device_id": "device-A"})
@@ -66,19 +66,19 @@ def test_change_password_success(client, registered_user):
 def test_change_password_wrong_current(client, registered_user):
     token = login(client, "device-A")
     res = client.post("/auth/change-password", headers=auth(token), json={
-        "current_password": "wrong-one", "new_password": "brandnew123"})
+        "erp": VALID_USER["erp"], "current_password": "wrong-one", "new_password": "brandnew123"})
     assert res.status_code == 400
 
 
 def test_change_password_same_as_old(client, registered_user):
     token = login(client, "device-A")
     res = client.post("/auth/change-password", headers=auth(token), json={
-        "current_password": VALID_USER["password"], "new_password": VALID_USER["password"]})
+        "erp": VALID_USER["erp"], "current_password": VALID_USER["password"], "new_password": VALID_USER["password"]})
     assert res.status_code == 400
 
 
 def test_change_password_too_short(client, registered_user):
     token = login(client, "device-A")
     res = client.post("/auth/change-password", headers=auth(token), json={
-        "current_password": VALID_USER["password"], "new_password": "short"})
+        "erp": VALID_USER["erp"], "current_password": VALID_USER["password"], "new_password": "short"})
     assert res.status_code == 400

@@ -39,3 +39,4 @@ Tests use a temporary in-memory database, so they don't need Supabase and never 
 |---|---|---|---|---|
 | POST | `/auth/signup` | `name, erp, email, password` | 201 `{token, user}` | 400 invalid field, 409 ERP/email already used |
 | POST | `/auth/login` | `identifier` (ERP or email), `password` | 200 `{token, user}` | 401 `Wrong username or password` |
+| POST | `/auth/change-password` | `erp, current_password, new_password` + header `Authorization: Bearer <token>` | 200 `{message}` | 400 wrong ERP/current password, too short, or same as current; 401 not logged in / logged in on another device |
