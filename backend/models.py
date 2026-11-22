@@ -20,3 +20,4 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     passwordhash = Column(String, nullable=False)
+    activedeviceid = Column(String, nullable=True)

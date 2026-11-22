@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'styles.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_session.dart';
+import 'auth_validators.dart';
 
 // Use http://10.0.2.2:8000 for Android Emulator, or http://127.0.0.1:8000 for Windows/Web/iOS Simulator
 const String _kBaseUrl = 'http://127.0.0.1:8000';
@@ -11,11 +14,15 @@ class ResetPasswordScreen extends StatefulWidget {
   final String? email;
   final String? code;
 
+  /// Tests pass a fake http client; the real app uses the default one.
+  final http.Client? client;
+
   const ResetPasswordScreen({
     super.key,
     this.isChangePassword = false,
     this.email,
     this.code,
+    this.client,
   });
 
   @override
@@ -25,6 +32,8 @@ class ResetPasswordScreen extends StatefulWidget {
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   late final TextEditingController _emailController;
   late final TextEditingController _codeController;
+  final _erpController = TextEditingController(); // change password only (FR-1.7)
+  late final http.Client _client = widget.client ?? http.Client();
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -46,35 +55,62 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   void dispose() {
     _emailController.dispose();
     _codeController.dispose();
+    _erpController.dispose();
     _currentController.dispose();
     _newController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
+  /// Shows an error under the form. Removes keyboard focus first: on Flutter
+  /// web (Chrome), a password field that keeps focus while the screen redraws
+  /// can get stuck and stop accepting typing.
+  void _showError(String message) {
+    FocusScope.of(context).unfocus();
+    setState(() => _error = message);
+  }
+
   Future<void> _save() async {
     final newPass = _newController.text;
     final confirmPass = _confirmController.text;
 
+    // SCRUM-13: change password needs the ERP + current password (Use Case 3).
+    if (widget.isChangePassword) {
+      final erpError = AuthValidators.erp(_erpController.text);
+      if (erpError != null) {
+        _showError(erpError);
+        return;
+      }
+      if (_currentController.text.isEmpty) {
+        _showError(AuthMessages.currentPasswordRequired);
+        return;
+      }
+      if (newPass.isNotEmpty && newPass == _currentController.text) {
+        // TC_AUTH_NEG_04: new password <> old password
+        _showError(AuthMessages.samePassword);
+        return;
+      }
+    }
+
     if (newPass.length < 8) {
-      setState(() => _error = 'Password must be at least 8 characters');
+      _showError('Password must be at least 8 characters');
       return;
     }
 
     if (newPass != confirmPass) {
       _newController.clear();
       _confirmController.clear();
-      setState(() => _error = "Passwords don't match");
+      _showError("Passwords don't match");
       return;
     }
 
     if (!widget.isChangePassword) {
       if (_emailController.text.trim().isEmpty) {
-        setState(() => _error = 'Please enter your email address');
+        _showError('Please enter your email address');
         return;
       }
       if (_codeController.text.trim().isEmpty) {
-        setState(() => _error = 'Please enter the 6-digit verification code');
+        _showError('Please enter the 6-digit verification code');
         return;
       }
     }
@@ -87,13 +123,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     try {
       http.Response response;
 
-      if (widget.isChangePassword) {
-        // Adjust path/body if your change-password endpoint uses a different route
+            if (widget.isChangePassword) {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
         final uri = Uri.parse('$_kBaseUrl/auth/change-password');
-        response = await http.post(
+        response = await _client.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',     // proves who we are
+          },
           body: jsonEncode({
+            'erp': _erpController.text.trim(),
             'current_password': _currentController.text,
             'new_password': newPass,
           }),
@@ -106,10 +147,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             'new_password': newPass,
           },
         );
-        response = await http.post(uri, headers: {'accept': 'application/json'});
+        response = await _client.post(uri, headers: {'accept': 'application/json'});
       }
 
       if (!mounted) return;
+
+            // 401 = token no longer valid (expired, or logged in on another device).
+      if (response.statusCode == 401 && widget.isChangePassword) {
+        var msg = 'Session expired. Please log in again';
+        try {
+          msg = jsonDecode(response.body)['detail'].toString();
+        } catch (_) {}
+        await clearSessionAndGoToWelcome(context, message: msg);
+        return;
+      }
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -124,11 +175,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             message = decoded['detail'].toString();
           }
         } catch (_) {}
-        setState(() => _error = message);
+        FocusScope.of(context).unfocus(); // same Chrome fix as _showError
+        setState(() {
+          _error = message;
+          // Wrong ERP/current password: clear the current password so they retype it.
+          if (widget.isChangePassword && response.statusCode == 400) {
+            _currentController.clear();
+          }
+        });
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Could not reach server. Check if backend is running.');
+      _showError('Could not reach server. Check if backend is running.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -145,6 +203,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return TextField(
       controller: controller,
       obscureText: hidden,
+      enableSuggestions: false,   // stops the browser's suggestions popup
+      autocorrect: false,
       decoration: InputDecoration(
         hintText: label,
         prefixIcon: const Icon(Icons.lock),
@@ -219,6 +279,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 ),
                 const SizedBox(height: 40),
                 if (widget.isChangePassword) ...[
+                  _infoField(
+                    label: 'ERP',
+                    controller: _erpController,
+                    icon: Icons.badge,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
                   _passwordField(
                     label: 'Current password',
                     controller: _currentController,

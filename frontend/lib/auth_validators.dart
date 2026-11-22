@@ -10,6 +10,9 @@ class AuthMessages {
   static const badEmail = 'Please enter your IBA email';
   static const shortPassword = 'Password must be at least 8 characters';
   static const passwordsDontMatch = "Passwords don't match";
+  static const currentPasswordRequired = 'Please enter your current password';
+  static const samePassword =
+      'New password must be different from the current password';
   static const serverUnreachable =
       'Could not reach the server. Check your connection and try again.';
 }
