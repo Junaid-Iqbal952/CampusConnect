@@ -54,6 +54,7 @@ class LoginRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
+    erp: str  # SCRUM-13 / FR-1.7: user confirms their ERP + current password
     current_password: str
     new_password: str
 
@@ -152,7 +153,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
     return _to_response(user, body.device_id)
 
-MSG_WRONG_CURRENT = "Current password is incorrect"
+MSG_WRONG_CURRENT = "Wrong ERP or current password"
 MSG_SAME_PASSWORD = "New password must be different from the current password"
 
 
@@ -176,7 +177,9 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     # A wrong current password is a 400, not 401, because 401 means "log the user out".
-    if not verify_password(body.current_password, user.passwordhash):
+    # ERP must belong to the logged-in account (Use Case 3). One message for both
+    # checks, like login, so it doesn't reveal which part was wrong.
+    if body.erp.strip() != user.erp or not verify_password(body.current_password, user.passwordhash):
         _bad_request(MSG_WRONG_CURRENT)
     if len(body.new_password) < MIN_PASSWORD_LENGTH:
         _bad_request(MSG_SHORT_PASSWORD)
