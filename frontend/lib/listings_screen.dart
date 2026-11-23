@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import 'dart:convert';
 
+import 'app_drawer.dart';
 import 'styles.dart';
 import 'listing_model.dart';
 import 'listing_detail_screen.dart';
@@ -159,6 +160,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      drawer: const AppDrawer(), // SCRUM-26 hamburger menu
       appBar: AppBar(
         centerTitle: true,
         title: const Text(
@@ -167,7 +169,15 @@ class _ListingsScreenState extends State<ListingsScreen> {
         ),
         backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
+        // Builder gives a context *inside* the Scaffold, so openDrawer() finds it.
+        leading: Builder(
+          builder: (context) => IconButton(
+            key: const Key('menu_button'),
+            icon: const Icon(Icons.menu),
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
