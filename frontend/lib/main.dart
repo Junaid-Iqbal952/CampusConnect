@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'splash_screen.dart';
-import 'listings_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +20,8 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const ListingsScreen(),
+      // Splash checks the saved login: logged in -> Listings, otherwise -> Welcome.
+      home: const SplashScreen(),
     );
   }
 }
