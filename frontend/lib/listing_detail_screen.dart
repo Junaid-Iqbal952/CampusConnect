@@ -27,13 +27,26 @@ class ListingDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. IMAGE
-            Container(
+                        Container(
               width: double.infinity,
               height: 250,
               color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.image, size: 100, color: Colors.grey),
-              ),
+              child: listing.imageUrl.isEmpty
+                  ? const Center(
+                      child: Icon(Icons.image, size: 100, color: Colors.grey),
+                    )
+                  : Image.network(
+                      listing.imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (context, error, stack) => const Center(
+                        child: Icon(Icons.broken_image,
+                            size: 100, color: Colors.grey),
+                      ),
+                    ),
             ),
 
             Padding(
@@ -135,7 +148,7 @@ class ListingDetailScreen extends StatelessWidget {
                   const SizedBox(height: 15),
 
                   // 6. CONDITION BOX
-                  _buildSectionBox(title: "Condition", content: "Good"),
+                  _buildSectionBox(title: "Condition", content: listing.condition),
 
                   const SizedBox(height: 30),
 

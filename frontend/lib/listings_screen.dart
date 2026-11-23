@@ -7,6 +7,8 @@ import 'app_drawer.dart';
 import 'styles.dart';
 import 'listing_model.dart';
 import 'listing_detail_screen.dart';
+import 'api_service.dart';
+import 'create_listing_screen.dart';
 
 class ListingsScreen extends StatefulWidget {
   const ListingsScreen({Key? key}) : super(key: key);
@@ -42,7 +44,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
 
     try {
       // Build the URL with parameters
-      String url = 'http://127.0.0.1:8000/listings?';
+      String url = '$apiBaseUrl/listings?';
 
       if (_searchController.text.isNotEmpty) {
         url += 'q=${Uri.encodeComponent(_searchController.text)}&';
@@ -341,17 +343,20 @@ class _ListingsScreenState extends State<ListingsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          // Open the form and wait. It comes back with true if a listing was posted.
+          final posted = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(
-              builder: (context) => const Scaffold(
-                body: Center(child: Text("Create Listing Page (Coming Soon!)")),
-              ),
-            ),
+            MaterialPageRoute(builder: (context) => const CreateListingScreen()),
           );
+          if (posted == true && mounted) {
+            fetchListings(); // reload so the new item shows up
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Listing posted')),
+            );
+          }
         },
-        backgroundColor: AppStyles.primaryColor,
+                backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add, size: 30),
       ),
@@ -374,17 +379,32 @@ class _ListingsScreenState extends State<ListingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 100,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
-                ),
+                        ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
               ),
-              child: const Center(
-                child: Icon(Icons.image, size: 50, color: Colors.grey),
+              child: Container(
+                height: 100,
+                width: double.infinity,
+                color: Colors.grey[300],
+                child: item.imageUrl.isEmpty
+                    ? const Center(
+                        child: Icon(Icons.image, size: 50, color: Colors.grey),
+                      )
+                    : Image.network(
+                        item.imageUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          );
+                        },
+                        errorBuilder: (context, error, stack) => const Center(
+                          child: Icon(Icons.broken_image,
+                              size: 50, color: Colors.grey),
+                        ),
+                      ),
               ),
             ),
             Padding(

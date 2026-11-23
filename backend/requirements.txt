@@ -9,3 +9,6 @@ PyJWT
 pytest
 httpx
 psycopg[binary]
+#for picture uploads
+cloudinary
+python-multipart
