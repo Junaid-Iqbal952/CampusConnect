@@ -8,6 +8,7 @@ import 'package:frontend/coming_soon_screen.dart';
 import 'package:frontend/listings_screen.dart';
 import 'package:frontend/welcome_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:frontend/create_listing_screen.dart';
 
 const menuItems = [
   'My Profile',
@@ -85,7 +86,7 @@ void main() {
     expect(find.byKey(const Key('app_drawer')), findsNothing); // menu closed
   });
 
-  for (final label in ['My Profile', 'My Dashboard', 'Post a New Listing']) {
+  for (final label in ['My Profile', 'My Dashboard']) {
     testWidgets('$label opens its (coming soon) page', (tester) async {
       await openMenu(tester);
       await tester.tap(find.text(label));
@@ -95,6 +96,14 @@ void main() {
       expect(find.widgetWithText(AppBar, label), findsOneWidget);
     });
   }
+
+  testWidgets('Post a New Listing opens the create listing form', (tester) async {
+  await openMenu(tester);
+  await tester.tap(find.text('Post a New Listing'));
+  await tester.pumpAndSettle();
+
+  expect(find.byType(CreateListingScreen), findsOneWidget);
+});
 
   testWidgets('Logout clears the saved login and goes to Welcome', (tester) async {
     await openMenu(tester);

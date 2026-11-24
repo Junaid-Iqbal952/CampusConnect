@@ -5,6 +5,7 @@ import 'auth_session.dart';
 import 'change_OR_reset_pw.dart';
 import 'coming_soon_screen.dart';
 import 'styles.dart';
+import 'create_listing_screen.dart';
 
 /// SCRUM-26: the hamburger menu (see "Hamburger Menu" wireframe).
 ///
@@ -117,7 +118,7 @@ class _AppDrawerState extends State<AppDrawer> {
             _item(
               icon: Icons.add_box_outlined,
               label: 'Post a New Listing',
-              onTap: () => _open(const ComingSoonScreen(title: 'Post a New Listing')),
+              onTap: () => _open(const CreateListingScreen()),
             ),
             _item(
               icon: Icons.lock_outline,
