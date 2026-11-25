@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
-import 'temp_home_screen.dart';
+import 'listings_screen.dart';
 import 'welcome_screen.dart';
 
 /// After a successful login/sign-up: save the token (the splash screen reads
-/// 'auth_token' to keep you logged in, SCRUM-12) and go to the home page,
+/// 'auth_token' to keep you logged in, SCRUM-12) and go to the Listings page,
 /// clearing history so Back can't return to the login screen (FR-1.8).
 Future<void> saveSessionAndGoHome(BuildContext context, AuthResult result) async {
   final prefs = await SharedPreferences.getInstance();
@@ -17,7 +17,7 @@ Future<void> saveSessionAndGoHome(BuildContext context, AuthResult result) async
   if (!context.mounted) return;
   Navigator.pushAndRemoveUntil(
     context,
-    MaterialPageRoute(builder: (context) => const TempHomeScreen()),
+    MaterialPageRoute(builder: (context) => const ListingsScreen()),
     (route) => false,
   );
 }

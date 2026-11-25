@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'auth_session.dart';
 import 'styles.dart';
-import 'temp_home_screen.dart';
+import 'listings_screen.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (!mounted) return;
-    _go(const TempHomeScreen());
+    _go(const ListingsScreen());
   }
 
   // pushReplacement removes the splash screen, so Back can't return to it.

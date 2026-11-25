@@ -7,7 +7,7 @@ import 'package:frontend/api_service.dart';
 import 'package:frontend/auth_validators.dart';
 import 'package:frontend/login_screen.dart';
 import 'package:frontend/signup_screen.dart';
-import 'package:frontend/temp_home_screen.dart';
+import 'package:frontend/listings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pretends to be the backend. Only "12345" / "secret123" logs in.
@@ -76,10 +76,10 @@ void main() {
       expect(find.text(AuthMessages.wrongCredentials), findsOneWidget);
       expect(textOf(tester, 'login_identifier'), isEmpty);
       expect(textOf(tester, 'login_password'), isEmpty);
-      expect(find.byType(TempHomeScreen), findsNothing);
+      expect(find.byType(ListingsScreen), findsNothing);
     });
 
-    testWidgets('TC_AUTH_POS_03: correct ERP + password saves token and goes home',
+    testWidgets('TC_AUTH_POS_03: correct ERP + password saves token and goes to listings',
         (tester) async {
       await pumpScreen(tester, LoginScreen(api: FakeAuthApi()));
 
@@ -88,7 +88,7 @@ void main() {
       await tester.tap(find.byKey(const Key('login_button')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TempHomeScreen), findsOneWidget);
+      expect(find.byType(ListingsScreen), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('auth_token'), 'fake-token');
     });
@@ -161,11 +161,11 @@ void main() {
       expect(find.text('An account with this ERP already exists'), findsOneWidget);
     });
 
-    testWidgets('valid details create the account and go home', (tester) async {
+    testWidgets('valid details create the account and go to listings', (tester) async {
       await pumpScreen(tester, SignupScreen(api: FakeAuthApi()));
       await fillForm(tester);
 
-      expect(find.byType(TempHomeScreen), findsOneWidget);
+      expect(find.byType(ListingsScreen), findsOneWidget);
     });
   });
 }
