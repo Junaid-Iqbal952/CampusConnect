@@ -24,10 +24,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
   bool isLoading = true;
   String? errorMessage;
 
-  // Filter & Sort State
   String selectedCampus = "All";
-  String selectedSort =
-      "newest"; // 'newest', 'oldest', 'price_asc', 'price_desc', 'alpha'
+  String selectedSort = "newest";
 
   @override
   void initState() {
@@ -35,7 +33,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
     fetchListings();
   }
 
-  // 1. The API Call (Now accepts query parameters)
   Future<void> fetchListings() async {
     setState(() {
       isLoading = true;
@@ -43,7 +40,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
     });
 
     try {
-      // Build the URL with parameters
       String url = '$apiBaseUrl/listings?';
 
       if (_searchController.text.isNotEmpty) {
@@ -95,74 +91,11 @@ class _ListingsScreenState extends State<ListingsScreen> {
     }
   }
 
-  // Helper to show the Sort menu
-  /* void _showSortMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  "Sort By",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-              ListTile(
-                title: const Text('Newest First'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => selectedSort = 'newest');
-                  fetchListings();
-                },
-              ),
-              ListTile(
-                title: const Text('Oldest First'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => selectedSort = 'oldest');
-                  fetchListings();
-                },
-              ),
-              ListTile(
-                title: const Text('Price: Low to High'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => selectedSort = 'price_asc');
-                  fetchListings();
-                },
-              ),
-              ListTile(
-                title: const Text('Price: High to Low'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => selectedSort = 'price_desc');
-                  fetchListings();
-                },
-              ),
-              ListTile(
-                title: const Text('Alphabetical (A-Z)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => selectedSort = 'alpha');
-                  fetchListings();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }*/
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      drawer: const AppDrawer(), // SCRUM-26 hamburger menu
+      drawer: const AppDrawer(),
       appBar: AppBar(
         centerTitle: true,
         title: const Text(
@@ -171,7 +104,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
         ),
         backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
-        // Builder gives a context *inside* the Scaffold, so openDrawer() finds it.
         leading: Builder(
           builder: (context) => IconButton(
             key: const Key('menu_button'),
@@ -189,13 +121,11 @@ class _ListingsScreenState extends State<ListingsScreen> {
       ),
       body: Column(
         children: [
-          // SEARCH BAR
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
-              onSubmitted: (value) =>
-                  fetchListings(), // Fetch from backend on Enter
+              onSubmitted: (value) => fetchListings(),
               decoration: InputDecoration(
                 hintText: "Search by item name or description",
                 prefixIcon: const Icon(Icons.search),
@@ -213,18 +143,14 @@ class _ListingsScreenState extends State<ListingsScreen> {
             ),
           ),
 
-          // FILTER AND SORT ROW
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               children: [
-                // CAMPUS FILTER
                 PopupMenuButton<String>(
                   onSelected: (String campus) {
-                    setState(() {
-                      selectedCampus = campus;
-                    });
-                    fetchListings(); // Re-fetch from backend
+                    setState(() => selectedCampus = campus);
+                    fetchListings();
                   },
                   itemBuilder: (BuildContext context) {
                     return ['All', 'Main', 'City'].map((String choice) {
@@ -260,16 +186,11 @@ class _ListingsScreenState extends State<ListingsScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 10),
-
-                // SORT BUTTON (PopupMenu)
                 PopupMenuButton<String>(
                   onSelected: (String sortOption) {
-                    setState(() {
-                      selectedSort = sortOption;
-                    });
-                    fetchListings(); // Re-fetch from backend
+                    setState(() => selectedSort = sortOption);
+                    fetchListings();
                   },
                   itemBuilder: (BuildContext context) {
                     return [
@@ -311,7 +232,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
 
           const SizedBox(height: 10),
 
-          // LISTINGS GRID
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -324,39 +244,46 @@ class _ListingsScreenState extends State<ListingsScreen> {
                   )
                 : listings.isEmpty
                 ? const Center(child: Text("No items found"))
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 0.75,
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: GridView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5.0,
+                          vertical: 16.0,
                         ),
-                    itemCount: listings.length,
-                    itemBuilder: (context, index) {
-                      final item = listings[index];
-                      return _buildListingCard(item);
-                    },
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 24,
+                              mainAxisSpacing: 24,
+                              childAspectRatio: 0.85,
+                            ),
+                        itemCount: listings.length,
+                        itemBuilder: (context, index) {
+                          return _buildListingCard(listings[index]);
+                        },
+                      ),
+                    ),
                   ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          // Open the form and wait. It comes back with true if a listing was posted.
           final posted = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(builder: (context) => const CreateListingScreen()),
+            MaterialPageRoute(
+              builder: (context) => const CreateListingScreen(),
+            ),
           );
           if (posted == true && mounted) {
-            fetchListings(); // reload so the new item shows up
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Listing posted')),
-            );
+            fetchListings();
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Listing posted')));
           }
         },
-                backgroundColor: AppStyles.primaryColor,
+        backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add, size: 30),
       ),
@@ -379,38 +306,55 @@ class _ListingsScreenState extends State<ListingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-                        ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
-              child: Container(
-                height: 100,
-                width: double.infinity,
-                color: Colors.grey[300],
-                child: item.imageUrl.isEmpty
-                    ? const Center(
-                        child: Icon(Icons.image, size: 50, color: Colors.grey),
-                      )
-                    : Image.network(
-                        item.imageUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          );
-                        },
-                        errorBuilder: (context, error, stack) => const Center(
-                          child: Icon(Icons.broken_image,
-                              size: 50, color: Colors.grey),
+            // 1. IMAGE TAKES ALL REMAINING SPACE
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.grey[200],
+                  child: item.imageUrl.isEmpty
+                      ? const Center(
+                          child: Icon(
+                            Icons.image,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                        )
+                      : Image.network(
+                          item.imageUrl,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          },
+                          errorBuilder: (context, error, stack) => const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 50,
+                              color: Colors.grey,
+                            ),
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
+
+            // 2. TEXT TAKES EXACTLY WHAT IT NEEDS (No overflow)
             Padding(
-              padding: const EdgeInsets.all(10.0),
+              padding: const EdgeInsets.only(
+                top: 14.0,
+                bottom: 14.0,
+                left: 12.0,
+                right: 12.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     item.name,
@@ -426,7 +370,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                     "${item.campus} Campus",
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     "Rs ${item.hourlyRate.toInt()} / hr",
                     style: const TextStyle(
