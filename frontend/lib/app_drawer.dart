@@ -6,6 +6,7 @@ import 'change_OR_reset_pw.dart';
 import 'coming_soon_screen.dart';
 import 'styles.dart';
 import 'create_listing_screen.dart';
+import 'profile_screen.dart';
 
 /// SCRUM-26: the hamburger menu (see "Hamburger Menu" wireframe).
 ///
@@ -46,7 +47,8 @@ class _AppDrawerState extends State<AppDrawer> {
     return Drawer(
       key: const Key('app_drawer'),
       backgroundColor: AppStyles.backgroundColor,
-      shape: const RoundedRectangleBorder(), // square corners like the wireframe
+      shape:
+          const RoundedRectangleBorder(), // square corners like the wireframe
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +71,9 @@ class _AppDrawerState extends State<AppDrawer> {
                   TextButton(
                     key: const Key('drawer_close'),
                     onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(foregroundColor: Colors.black87),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                    ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -93,7 +97,10 @@ class _AppDrawerState extends State<AppDrawer> {
                   Text(
                     _userName.isEmpty ? 'Student' : _userName,
                     key: const Key('drawer_user_name'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   const Text(
@@ -108,7 +115,7 @@ class _AppDrawerState extends State<AppDrawer> {
             _item(
               icon: Icons.person_outline,
               label: 'My Profile',
-              onTap: () => _open(const ComingSoonScreen(title: 'My Profile')),
+              onTap: () => _open(const ProfileScreen()),
             ),
             _item(
               icon: Icons.dashboard_outlined,
@@ -123,7 +130,8 @@ class _AppDrawerState extends State<AppDrawer> {
             _item(
               icon: Icons.lock_outline,
               label: 'Change Password',
-              onTap: () => _open(const ResetPasswordScreen(isChangePassword: true)),
+              onTap: () =>
+                  _open(const ResetPasswordScreen(isChangePassword: true)),
             ),
             _item(
               icon: Icons.logout,
