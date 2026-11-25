@@ -22,6 +22,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Timer? _cooldownTimer;
   int _secondsRemaining = 0;
   bool _isSending = false;
+  bool _isVerifying = false;
   bool _codeSent = false;
   String? _statusMessage;
   String? _error;
@@ -89,7 +90,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         try {
           final decoded = jsonDecode(response.body);
           if (decoded is Map && decoded['test_code'] != null) {
-            // Helpful while testing before email delivery is wired up
             message = 'Code sent (dev code: ${decoded['test_code']}). Valid 5 min.';
           }
         } catch (_) {}
@@ -125,11 +125,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _continueToReset() async {
-    final email = _emailController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final code = _codeController.text.trim();
 
-    if (email.isEmpty) {
-      setState(() => _error = 'Please enter your email address');
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'Please enter a valid email address');
       return;
     }
     if (code.length != 6) {
@@ -137,21 +137,64 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
 
-    setState(() => _error = null);
-    final didReset = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResetPasswordScreen(
-          isChangePassword: false,
-          email: email,
-          code: code,
-        ),
-      ),
-    );
+    setState(() {
+      _error = null;
+      _isVerifying = true;
+    });
 
-    if (!mounted) return;
-    if (didReset == true) {
-      Navigator.pop(context, true);
+    try {
+      final uri = Uri.parse('$_kBaseUrl/auth/verify-code').replace(
+        queryParameters: {
+          'email': email,
+          'code': code,
+        },
+      );
+      final response = await http.post(
+        uri,
+        headers: {'accept': 'application/json'},
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        setState(() => _isVerifying = false);
+
+        // Replace ResetPasswordScreen with the widget class defined in change_OR_reset_pw.dart
+        final didReset = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ResetPasswordScreen(
+              isChangePassword: false,
+              email: email,
+              code: code,
+            ),
+          ),
+        );
+
+        if (!mounted) return;
+        if (didReset == true) {
+          Navigator.pop(context, true);
+        }
+      } else {
+        String detail = 'Invalid verification code (${response.statusCode})';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['detail'] != null) {
+            detail = decoded['detail'].toString();
+          }
+        } catch (_) {}
+
+        setState(() {
+          _error = detail;
+          _isVerifying = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not reach server. Check if backend is running.';
+        _isVerifying = false;
+      });
     }
   }
 
@@ -204,6 +247,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 32),
                 TextField(
                   controller: _emailController,
+                  readOnly: _codeSent,
                   keyboardType: TextInputType.emailAddress,
                   decoration: _pillDecoration(
                     hint: 'Email address',
@@ -212,7 +256,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: (_isSending || isCoolingDown) ? null : _requestCode,
+                  onPressed: (_isSending || _isVerifying || isCoolingDown)
+                      ? null
+                      : _requestCode,
                   style: AppStyles.primaryButtonStyle,
                   child: _isSending
                       ? const SizedBox(
@@ -240,12 +286,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _continueToReset,
+                    onPressed: (_isVerifying || _isSending) ? null : _continueToReset,
                     style: AppStyles.primaryButtonStyle,
-                    child: const Text(
-                      'VERIFY & SET PASSWORD',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    child: _isVerifying
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'VERIFY & SET PASSWORD',
+                            style: TextStyle(fontSize: 16),
+                          ),
                   ),
                 ],
                 if (_statusMessage != null) ...[
