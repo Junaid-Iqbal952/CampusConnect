@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/app_drawer.dart';
 import 'package:frontend/change_OR_reset_pw.dart';
-import 'package:frontend/coming_soon_screen.dart';
 import 'package:frontend/listings_screen.dart';
 import 'package:frontend/welcome_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend/create_listing_screen.dart';
+import 'package:frontend/dashboard.dart';
+import 'package:frontend/profile_screen.dart';
 
 const menuItems = [
   'My Profile',
@@ -86,16 +87,28 @@ void main() {
     expect(find.byKey(const Key('app_drawer')), findsNothing); // menu closed
   });
 
-  for (final label in ['My Profile', 'My Dashboard']) {
-    testWidgets('$label opens its (coming soon) page', (tester) async {
-      await openMenu(tester);
-      await tester.tap(find.text(label));
-      await tester.pumpAndSettle();
+  testWidgets('My Profile opens the profile page', (tester) async {
+    await openMenu(tester);
+    await tester.tap(find.text('My Profile'));
+    await tester.pump(); // page is built (still hidden for this frame)
+    await tester.pump(const Duration(seconds: 1)); // slide-in done, page visible
 
-      expect(find.byType(ComingSoonScreen), findsOneWidget);
-      expect(find.widgetWithText(AppBar, label), findsOneWidget);
-    });
-  }
+    expect(find.byType(ProfileScreen), findsOneWidget);
+  });
+
+  testWidgets('My Dashboard opens the dashboard page', (tester) async {
+    await openMenu(tester);
+    await tester.tap(find.text('My Dashboard'));
+    await tester.pump(); // page is built (still hidden for this frame)
+    await tester.pump(const Duration(seconds: 1)); // slide-in done, page visible
+
+    expect(find.byType(MyDashboardScreen), findsOneWidget);
+    expect(find.text('My Listings'), findsOneWidget);
+
+    // Let the dashboard's 15-second request timeout finish so no timer is
+    // left running when the test ends.
+    await tester.pump(const Duration(seconds: 16));
+  });
 
   testWidgets('Post a New Listing opens the create listing form', (tester) async {
   await openMenu(tester);

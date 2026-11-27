@@ -58,21 +58,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
 
         setState(() {
           listings = items
-              .map(
-                (json) => Listing(
-                  id: json['id'],
-                  name: json['name'],
-                  description: json['description'],
-                  hourlyRate: json['hourly_rate'].toDouble(),
-                  campus: json['campus'],
-                  negotiable: json['negotiable'],
-                  imageUrl: json['image_url'],
-                  ownerUsername: json['owner_username'],
-                  condition: json['condition'],
-                  maxDuration: json['max_duration'],
-                  postedAt: json['posted_at'],
-                ),
-              )
+              .map((json) => Listing.fromJson(json))
               .toList();
           isLoading = false;
         });

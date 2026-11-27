@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'api_service.dart';
 import 'auth_validators.dart';
-
+import 'listing_model.dart';
 /// Talks to POST /listings in backend/listings.py.
 class ListingApi {
   final http.Client _client;
@@ -54,7 +54,31 @@ class ListingApi {
     }
     throw AuthException(detail ?? 'Something went wrong (${res.statusCode})');
   }
+  /// GET /listings/mine: every listing the logged-in user posted (My Dashboard).
+  Future<List<Listing>> getMyListings(String token) async {
+    final http.Response res;
+    try {
+      res = await _client
+          .get(
+            Uri.parse('$apiBaseUrl/listings/mine'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw AuthException(AuthMessages.serverUnreachable);
+    }
 
+    if (res.statusCode == 200) {
+      final items = jsonDecode(res.body)['data']['items'] as List;
+      return items.map((json) => Listing.fromJson(json)).toList();
+    }
+
+    final detail = _detail(res.body);
+    if (res.statusCode == 401) {
+      throw SessionExpiredException(detail ?? 'Session expired. Please log in again');
+    }
+    throw AuthException(detail ?? 'Could not load your listings (${res.statusCode})');
+  }
   /// FastAPI errors look like {"detail": "message"}. Returns the message, or null.
   String? _detail(String body) {
     try {

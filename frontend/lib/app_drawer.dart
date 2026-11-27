@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'dashboard.dart';
 import 'auth_session.dart';
 import 'change_OR_reset_pw.dart';
 import 'coming_soon_screen.dart';
@@ -120,7 +120,7 @@ class _AppDrawerState extends State<AppDrawer> {
             _item(
               icon: Icons.dashboard_outlined,
               label: 'My Dashboard',
-              onTap: () => _open(const ComingSoonScreen(title: 'My Dashboard')),
+              onTap: () => _open(const MyDashboardScreen()),
             ),
             _item(
               icon: Icons.add_box_outlined,

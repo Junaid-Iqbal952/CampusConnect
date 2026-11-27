@@ -41,3 +41,4 @@ Tests use a temporary in-memory database, so they don't need Supabase and never 
 | POST | `/auth/login` | `identifier` (ERP or email), `password` | 200 `{token, user}` | 401 `Wrong username or password` |
 | POST | `/auth/change-password` | `erp, current_password, new_password` + header `Authorization: Bearer <token>` | 200 `{message}` | 400 wrong ERP/current password, too short, or same as current; 401 not logged in / logged in on another device |
 | POST | `/listings` | form: `title, description, hourly_rate, condition, max_duration (days), negotiable, campus (Main/City), photo (jpg/png)` + header `Authorization: Bearer <token>` | 201 `{message, data}` | 400 invalid field or photo, 401 not logged in, 502 photo upload failed |
+| GET | `/listings/mine` | header `Authorization: Bearer <token>` | 200 `{data: {items}}` (your own listings, newest first, each with `status`) | 401 not logged in |

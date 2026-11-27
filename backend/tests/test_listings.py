@@ -115,3 +115,62 @@ def test_upload_failure_saves_nothing(_upload, client, registered_user):
     assert res.status_code == 502
     assert res.json()["detail"] == MSG_UPLOAD_FAILED
     assert client.get("/listings").json()["data"]["items"] == []
+
+    # ---------- My Listings (dashboard, SCRUM-51) ----------
+
+OTHER_USER = {
+    "name": "Sara Ahmed",
+    "erp": "67890",
+    "email": "s.ahmed.67890@khi.iba.edu.pk",
+    "password": "secret456",
+}
+
+
+def other_user_token(client):
+    assert client.post("/auth/signup", json=OTHER_USER).status_code == 201
+    res = client.post(
+        "/auth/login",
+        json={"identifier": "67890", "password": "secret456", "device_id": "device-B"},
+    )
+    assert res.status_code == 200
+    return res.json()["token"]
+
+
+def get_mine(client, token):
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return client.get("/listings/mine", headers=headers)
+
+
+@patch("listings.upload_listing_photo", return_value=FAKE_URL)
+def test_my_listings_shows_only_my_own(_upload, client, registered_user):
+    my_token = login_token(client)
+    sara_token = other_user_token(client)
+    post_listing(client, my_token, good_form(title="My calculator"))
+    post_listing(client, sara_token, good_form(title="Sara's lab coat"))
+
+    res = get_mine(client, my_token)
+    assert res.status_code == 200
+    items = res.json()["data"]["items"]
+    assert [i["name"] for i in items] == ["My calculator"]
+    assert items[0]["owner_username"] == "Ali Khan"
+    assert items[0]["status"] == "available"
+
+
+@patch("listings.upload_listing_photo", return_value=FAKE_URL)
+def test_my_listings_newest_first(_upload, client, registered_user):
+    token = login_token(client)
+    post_listing(client, token, good_form(title="First"))
+    post_listing(client, token, good_form(title="Second"))
+
+    names = [i["name"] for i in get_mine(client, token).json()["data"]["items"]]
+    assert names == ["Second", "First"]
+
+
+def test_my_listings_empty_when_nothing_posted(client, registered_user):
+    res = get_mine(client, login_token(client))
+    assert res.status_code == 200
+    assert res.json()["data"]["items"] == []
+
+
+def test_my_listings_must_be_logged_in(client):
+    assert get_mine(client, token=None).status_code == 401

@@ -97,6 +97,40 @@ def get_listings(
         })
         
     return {"data": {"items": listings}}
+    
+# ---------- My Listings (dashboard) ----------
+
+@router.get("/listings/mine")
+def get_my_listings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),  # must be logged in
+):
+    """Every listing the logged-in user posted, newest first (any status)."""
+    rows = (
+        db.query(Listing)
+        .filter(Listing.userid == user.userid)  # only MY listings
+        .order_by(Listing.postedat.desc(), Listing.listingid.desc())
+        .all()
+    )
+
+    items = []
+    for l in rows:
+        items.append({
+            "id": l.listingid,
+            "name": l.title,
+            "description": l.description,
+            "hourly_rate": float(l.hourlyrate),
+            "campus": l.campus,
+            "negotiable": bool(l.negotiable),
+            "image_url": l.photourl or "",
+            "condition": l.condition or "Not specified",
+            "max_duration": l.maxduration or 1,
+            "posted_at": str(l.postedat),
+            "owner_username": user.name,
+            "status": l.status or "available",
+        })
+
+    return {"data": {"items": items}}
 
 # ---------- Post a new listing ----------
 
