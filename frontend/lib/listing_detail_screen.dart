@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'styles.dart';
 import 'listing_model.dart';
+import 'request_rent_button.dart';
 
 class ListingDetailScreen extends StatelessWidget {
   final Listing listing;
@@ -152,23 +153,8 @@ class ListingDetailScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // 7. REQUEST FOR RENT BUTTON
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      style: AppStyles.primaryButtonStyle,
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Rent Request Sent!")),
-                        );
-                      },
-                      child: const Text(
-                        "REQUEST FOR RENT",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
+                  // 7. REQUEST FOR RENT BUTTON (SCRUM-37, request_rent_button.dart)
+                  RequestRentButton(listingId: listing.id),
                 ],
               ),
             ),

@@ -38,3 +38,19 @@ class Listing(Base):
     # We never set these two: the database fills them in (status = 'available').
     status = Column(String, server_default="available")
     postedat = Column(DateTime, server_default=func.now())
+
+# ---------- Rental requests (SCRUM-37) ----------
+# The table already exists in Supabase (Sprint 0 schema).
+# "status" is a Postgres ENUM there (requeststatus). The code
+# writes enum values as plain SQL text, e.g. status = 'pending', which Postgres
+# accepts for enums. This model is mainly so the tests can create the table
+# in SQLite.
+
+class RentalRequest(Base):
+    __tablename__ = "rental_requests"
+
+    requestid = Column(Integer, primary_key=True, autoincrement=True)
+    listingid = Column(Integer, nullable=False)
+    borrowerid = Column(Integer, nullable=False)
+    status = Column(String, nullable=False)
+    requestedat = Column(DateTime, server_default=func.now())

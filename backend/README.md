@@ -43,3 +43,13 @@ Tests use a temporary in-memory database, so they don't need Supabase and never 
 | POST | `/listings` | form: `title, description, hourly_rate, condition, max_duration (days), negotiable, campus (Main/City), photo (jpg/png)` + header `Authorization: Bearer <token>` | 201 `{message, data}` | 400 invalid field or photo, 401 not logged in, 502 photo upload failed |
 | GET | `/listings/mine` | header `Authorization: Bearer <token>` | 200 `{data: {items}}` (your own listings, newest first, each with `status`) | 401 not logged in |
 | PUT | `/listings/{id}` | same form as POST, but `photo` is optional (leave it out to keep the old photo) + header `Authorization: Bearer <token>` | 200 `{message, data}` | 400 invalid field or photo, 401 not logged in, 403 not your listing, 404 no such listing, 409 listing not available, 502 photo upload failed |
+## Rental requests (SCRUM-37) — `rental_requests.py`
+
+Both need `Authorization: Bearer <token>`.
+
+| Method | Path | Success | Errors (`{"detail": "..."}`) |
+|---|---|---|---|
+| POST | `/listings/{id}/request` | 201 `{request_id, status: "pending", message}` | 400 own listing, 404 no such listing, 409 already requested / not available |
+| GET | `/listings/{id}/request-status` | 200 `{is_owner, already_requested, listing_available}` | 404 |
+
+Enum words (`pending`, `available`) are constants at the top of `rental_requests.py`.
