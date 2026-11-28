@@ -21,6 +21,7 @@ class AppDrawer extends StatefulWidget {
 
 class _AppDrawerState extends State<AppDrawer> {
   String _userName = '';
+  bool _mapsExpanded = false;
 
   @override
   void initState() {
@@ -40,6 +41,71 @@ class _AppDrawerState extends State<AppDrawer> {
   void _open(Widget page) {
     Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  void _openCampusMap(
+    BuildContext rootContext, {
+    required String campusName,
+    required String assetPath,
+  }) {
+    Navigator.pop(context); // close the drawer first
+    showDialog<void>(
+      context: rootContext,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: AppStyles.backgroundColor,
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.map_outlined, color: AppStyles.primaryColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      campusName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(dialogContext).size.height * 0.7,
+              ),
+              child: InteractiveViewer(
+                minScale: 1.0,
+                maxScale: 4.0,
+                child: Image.asset(
+                  assetPath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Campus map image not found.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -127,6 +193,7 @@ class _AppDrawerState extends State<AppDrawer> {
               label: 'Post a New Listing',
               onTap: () => _open(const CreateListingScreen()),
             ),
+            _campusMapsItem(context),
             _item(
               icon: Icons.lock_outline,
               label: 'Change Password',
@@ -143,6 +210,52 @@ class _AppDrawerState extends State<AppDrawer> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _campusMapsItem(BuildContext rootContext) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: EdgeInsets.zero,
+              leading: Icon(Icons.map_outlined, color: AppStyles.primaryColor),
+              title: const Text('Campus Maps', style: TextStyle(fontSize: 15)),
+              trailing: Icon(
+                _mapsExpanded ? Icons.expand_less : Icons.expand_more,
+                color: Colors.black54,
+              ),
+              onExpansionChanged: (expanded) =>
+                  setState(() => _mapsExpanded = expanded),
+              children: [
+                ListTile(
+  contentPadding: const EdgeInsets.only(left: 40),
+  title: const Text('Main Campus', style: TextStyle(fontSize: 14)),
+  onTap: () => _openCampusMap(
+    rootContext,
+    campusName: 'IBA Main Campus Map',
+    assetPath: 'assets/main_campus_map.jpg',
+  ),
+),
+ListTile(
+  contentPadding: const EdgeInsets.only(left: 40),
+  title: const Text('City Campus', style: TextStyle(fontSize: 14)),
+  onTap: () => _openCampusMap(
+    rootContext,
+    campusName: 'IBA City Campus Map',
+    assetPath: 'assets/city_campus_map.jpg',
+  ),
+),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+        ],
       ),
     );
   }
