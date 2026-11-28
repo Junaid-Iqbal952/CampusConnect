@@ -14,6 +14,7 @@ from security import hash_password
 from listings import router as listings_router
 from typing import Optional
 from profile import router as profile_router
+from rental_requests import router as rental_requests_router
 
 load_dotenv()
 app = FastAPI(title="CampusConnect API")
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(listings_router)
 app.include_router(profile_router)
+app.include_router(rental_requests_router)  # SCRUM-37
 
 
 # test database connection
