@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'auth_session.dart';
+import 'create_listing_screen.dart';
 import 'listing_api.dart';
 import 'listing_model.dart';
 import 'styles.dart';
@@ -65,6 +66,19 @@ class _MyDashboardScreenState extends State<MyDashboardScreen> {
         _errorMessage = e.message;
         _isLoading = false;
       });
+    }
+  }
+
+  /// Opens the form filled with this listing. Reloads the list if it was saved.
+  Future<void> _openEdit(Listing item) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateListingScreen(api: widget.api, listing: item),
+      ),
+    );
+    if (saved == true && mounted) {
+      _loadMyListings();
     }
   }
 
@@ -215,7 +229,20 @@ class _MyDashboardScreenState extends State<MyDashboardScreen> {
                   ],
                 ),
               ),
-              _statusChip(item.status),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _statusChip(item.status),
+                  // Only available listings can be edited (the backend says 409 otherwise).
+                  if (item.status == 'available')
+                    TextButton.icon(
+                      key: Key('edit_listing_${item.id}'),
+                      onPressed: () => _openEdit(item),
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit'),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

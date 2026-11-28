@@ -174,3 +174,102 @@ def test_my_listings_empty_when_nothing_posted(client, registered_user):
 
 def test_my_listings_must_be_logged_in(client):
     assert get_mine(client, token=None).status_code == 401
+
+# ---------- Edit a listing (SCRUM-24) ----------
+
+from listings import MSG_NOT_AVAILABLE, MSG_NOT_FOUND, MSG_NOT_OWNER
+from models import Listing
+
+NEW_URL = "https://res.cloudinary.com/test/image/upload/new.png"
+
+
+def put_listing(client, token, listing_id, form=None, photo=None):
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    files = {"photo": ("new.png", photo, "image/png")} if photo is not None else None
+    return client.put(f"/listings/{listing_id}", data=form or good_form(), files=files, headers=headers)
+
+
+def post_and_get_id(client, token):
+    with patch("listings.upload_listing_photo", return_value=FAKE_URL):
+        res = post_listing(client, token)
+    assert res.status_code == 201
+    return res.json()["data"]["id"]
+
+
+def test_edit_changes_fields_and_keeps_old_photo(client, registered_user):
+    token = login_token(client)
+    listing_id = post_and_get_id(client, token)
+
+    form = good_form(title="Casio FX-991 (new cover)", hourly_rate="35", campus="city",
+                     negotiable="false", max_duration="7")
+    res = put_listing(client, token, listing_id, form)  # no photo sent
+    assert res.status_code == 200
+    assert res.json()["data"]["image_url"] == FAKE_URL  # old photo kept
+
+    item = get_mine(client, token).json()["data"]["items"][0]
+    assert item["name"] == "Casio FX-991 (new cover)"
+    assert item["hourly_rate"] == 35.0
+    assert item["campus"] == "City"
+    assert item["max_duration"] == 7
+    assert item["negotiable"] is False
+    assert item["image_url"] == FAKE_URL
+
+
+@patch("listings.upload_listing_photo", return_value=NEW_URL)
+def test_edit_with_new_photo_replaces_it(_upload, client, registered_user):
+    token = login_token(client)
+    listing_id = post_and_get_id(client, token)
+
+    res = put_listing(client, token, listing_id, photo=PNG)
+    assert res.status_code == 200
+    assert get_mine(client, token).json()["data"]["items"][0]["image_url"] == NEW_URL
+
+
+def test_edit_missing_listing_is_404(client, registered_user):
+    res = put_listing(client, login_token(client), 9999)
+    assert res.status_code == 404
+    assert res.json()["detail"] == MSG_NOT_FOUND
+
+
+def test_edit_someone_elses_listing_is_403(client, registered_user):
+    listing_id = post_and_get_id(client, login_token(client))  # Ali's listing
+    res = put_listing(client, other_user_token(client), listing_id)  # Sara tries
+    assert res.status_code == 403
+    assert res.json()["detail"] == MSG_NOT_OWNER
+
+
+def test_edit_not_available_is_409(client, db_session, registered_user):
+    token = login_token(client)
+    listing_id = post_and_get_id(client, token)
+
+    # Pretend someone is renting it right now.
+    listing = db_session.get(Listing, listing_id)
+    listing.status = "rented"
+    db_session.commit()
+
+    res = put_listing(client, token, listing_id)
+    assert res.status_code == 409
+    assert res.json()["detail"] == MSG_NOT_AVAILABLE
+
+
+def test_edit_bad_field_is_400_and_nothing_changes(client, registered_user):
+    token = login_token(client)
+    listing_id = post_and_get_id(client, token)
+
+    res = put_listing(client, token, listing_id, good_form(hourly_rate="0"))
+    assert res.status_code == 400
+    assert res.json()["detail"] == MSG_RATE
+    assert get_mine(client, token).json()["data"]["items"][0]["hourly_rate"] == 20.0
+
+
+def test_edit_bad_photo_is_400(client, registered_user):
+    token = login_token(client)
+    listing_id = post_and_get_id(client, token)
+    res = put_listing(client, token, listing_id, photo=b"this is just text")
+    assert res.status_code == 400
+    assert res.json()["detail"] == MSG_PHOTO_TYPE
+
+
+def test_edit_must_be_logged_in(client, registered_user):
+    listing_id = post_and_get_id(client, login_token(client))
+    assert put_listing(client, None, listing_id).status_code == 401

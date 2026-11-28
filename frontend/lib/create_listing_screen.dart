@@ -8,12 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'auth_session.dart';
 import 'listing_api.dart';
+import 'listing_model.dart';
 import 'styles.dart';
 
-/// The "post a listing" form. Pops with `true` when the listing was posted.
+/// The "post a listing" form, also used to EDIT a listing (SCRUM-24).
+/// Pass [listing] to edit it; leave it out to post a new one.
+/// Pops with `true` when the listing was posted / saved.
 class CreateListingScreen extends StatefulWidget {
   final ListingApi? api; // tests can pass a fake one
-  const CreateListingScreen({super.key, this.api});
+  final Listing? listing; // the listing being edited, or null for a new one
+  const CreateListingScreen({super.key, this.api, this.listing});
 
   @override
   State<CreateListingScreen> createState() => _CreateListingScreenState();
@@ -39,6 +43,31 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   bool _isSubmitting = false;
   String? _photoError;
   String? _serverError;
+
+  bool get _isEditing => widget.listing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final old = widget.listing;
+    if (old != null) {
+      // Edit mode: fill the form with what is saved now.
+      _titleController.text = old.name;
+      _descriptionController.text = old.description;
+      _rateController.text = _rateText(old.hourlyRate);
+      _conditionController.text = old.condition;
+      _durationController.text = old.maxDuration.toString();
+      _negotiable = old.negotiable;
+      _campus = campuses.contains(old.campus) ? old.campus : null;
+    }
+  }
+
+  /// 20.0 -> "20", 20.5 -> "20.50" (fits the 2-decimal rule on the field).
+  static String _rateText(double rate) {
+    return rate == rate.roundToDouble()
+        ? rate.toInt().toString()
+        : rate.toStringAsFixed(2);
+  }
 
   @override
   void dispose() {
@@ -73,11 +102,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   Future<void> _submit() async {
     final formOk = _formKey.currentState!.validate();
+    // A new listing needs a photo. When editing, no new photo = keep the old one.
+    final photoMissing = !_isEditing && _photoBytes == null;
     setState(() {
-      _photoError = _photoBytes == null ? 'Please add a photo' : null;
+      _photoError = photoMissing ? 'Please add a photo' : null;
       _serverError = null;
     });
-    if (!formOk || _photoBytes == null) return; // stop, errors are on screen
+    if (!formOk || photoMissing) return; // stop, errors are on screen
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -90,20 +121,36 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await _api.createListing(
-        token: token,
-        title: _titleController.text,
-        description: _descriptionController.text,
-        hourlyRate: _rateController.text,
-        condition: _conditionController.text,
-        maxDuration: _durationController.text,
-        negotiable: _negotiable,
-        campus: _campus!,
-        photoBytes: _photoBytes!,
-        photoName: _photoName,
-      );
+      if (_isEditing) {
+        await _api.updateListing(
+          token: token,
+          listingId: widget.listing!.id,
+          title: _titleController.text,
+          description: _descriptionController.text,
+          hourlyRate: _rateController.text,
+          condition: _conditionController.text,
+          maxDuration: _durationController.text,
+          negotiable: _negotiable,
+          campus: _campus!,
+          photoBytes: _photoBytes, // null = keep the old photo
+          photoName: _photoName,
+        );
+      } else {
+        await _api.createListing(
+          token: token,
+          title: _titleController.text,
+          description: _descriptionController.text,
+          hourlyRate: _rateController.text,
+          condition: _conditionController.text,
+          maxDuration: _durationController.text,
+          negotiable: _negotiable,
+          campus: _campus!,
+          photoBytes: _photoBytes!,
+          photoName: _photoName,
+        );
+      }
       if (!mounted) return;
-      Navigator.pop(context, true); // tell the listings page it worked
+      Navigator.pop(context, true); // tell the page that opened us it worked
     } on SessionExpiredException catch (e) {
       // must come BEFORE AuthException (it is a child of it)
       if (!mounted) return;
@@ -123,8 +170,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('Post a Listing',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(_isEditing ? 'Edit Listing' : 'Post a Listing',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: AppStyles.primaryColor,
         foregroundColor: Colors.white,
       ),
@@ -206,6 +253,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
+                    initialValue: _campus, // filled in when editing
                     decoration: const InputDecoration(
                         labelText: 'Campus', border: OutlineInputBorder()),
                     items: campuses
@@ -234,7 +282,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Post Listing'),
+                        : Text(_isEditing ? 'Save changes' : 'Post Listing'),
                   ),
                 ],
               ),
@@ -261,20 +309,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             clipBehavior: Clip.antiAlias,
-            child: _photoBytes == null
-                ? const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Tap to add a photo'),
-                      ],
-                    ),
-                  )
-                : Image.memory(_photoBytes!, fit: BoxFit.cover),
+            child: _photoPreview(),
           ),
         ),
+        if (_isEditing)
+          const Padding(
+            padding: EdgeInsets.only(top: 6, left: 12),
+            child: Text('Tap the photo to change it',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ),
         if (_photoError != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 12),
@@ -283,6 +326,35 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 style: const TextStyle(color: Colors.red, fontSize: 12)),
           ),
       ],
+    );
+  }
+
+  /// What shows inside the photo box:
+  /// the new photo if one was picked, else the current photo (edit mode),
+  /// else the "Tap to add a photo" hint.
+  Widget _photoPreview() {
+    if (_photoBytes != null) {
+      return Image.memory(_photoBytes!, fit: BoxFit.cover);
+    }
+    final oldUrl = widget.listing?.imageUrl ?? '';
+    if (oldUrl.isNotEmpty) {
+      return Image.network(
+        oldUrl,
+        key: const Key('current_photo'),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) =>
+            const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+      );
+    }
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
+          SizedBox(height: 8),
+          Text('Tap to add a photo'),
+        ],
+      ),
     );
   }
 }

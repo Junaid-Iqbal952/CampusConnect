@@ -32,6 +32,9 @@ MSG_PHOTO_REQUIRED = "Please add a photo"
 MSG_PHOTO_TYPE = "Photo must be a JPG or PNG image"
 MSG_PHOTO_SIZE = f"Photo must be {MAX_PHOTO_MB} MB or smaller"
 MSG_UPLOAD_FAILED = "Could not upload the photo. Please try again"
+MSG_NOT_FOUND = "Listing not found"
+MSG_NOT_OWNER = "You can only edit your own listings"
+MSG_NOT_AVAILABLE = "This listing can no longer be edited because it is not available"
 
 @router.get("/listings")
 def get_listings(
@@ -132,7 +135,7 @@ def get_my_listings(
 
     return {"data": {"items": items}}
 
-# ---------- Post a new listing ----------
+# ---------- Shared checks (used by create AND edit) ----------
 
 def _bad_request(message: str):
     raise HTTPException(status_code=400, detail=message)
@@ -145,25 +148,13 @@ def _looks_like_image(data: bytes) -> bool:
     return is_jpeg or is_png
 
 
-@router.post("/listings", status_code=201)
-def create_listing(
-    title: str = Form(""),
-    description: str = Form(""),
-    hourly_rate: float = Form(0),
-    condition: str = Form(""),
-    max_duration: int = Form(0),
-    negotiable: bool = Form(False),
-    campus: str = Form(""),
-    photo: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),  # must be logged in; gives us the owner
-):
-    """Create a listing for the logged-in user (lender)."""
+def _check_fields(title, description, hourly_rate, condition, max_duration, campus) -> dict:
+    """Checks every text field. Sends back a 400 with the first problem found.
+    If all is fine, returns the cleaned values (spaces trimmed, campus spelled right)."""
     title = title.strip()
     description = description.strip()
     condition = condition.strip()
 
-    # 1. Check every field. The first problem found is sent back as the error.
     if not title or len(title) > MAX_TITLE_LENGTH:
         _bad_request(MSG_TITLE)
     if not description or len(description) > MAX_DESCRIPTION_LENGTH:
@@ -181,35 +172,113 @@ def create_listing(
     if campus is None:
         _bad_request(MSG_CAMPUS)
 
-    # 2. Check the photo.
-    photo_bytes = photo.file.read() if photo is not None else b""
-    if not photo_bytes:
-        _bad_request(MSG_PHOTO_REQUIRED)
+    return {
+        "title": title,
+        "description": description,
+        "hourlyrate": round(hourly_rate, 2),
+        "condition": condition,
+        "maxduration": max_duration,
+        "campus": campus,
+    }
+
+
+def _check_photo(photo_bytes: bytes):
+    """Size and type check for a photo that WAS sent."""
     if len(photo_bytes) > MAX_PHOTO_BYTES:
         _bad_request(MSG_PHOTO_SIZE)
     if not _looks_like_image(photo_bytes):
         _bad_request(MSG_PHOTO_TYPE)
 
-    # 3. Upload the photo. If this fails we stop BEFORE saving anything.
+
+def _upload(photo_bytes: bytes) -> str:
+    """Uploads to Cloudinary. If it fails we stop BEFORE saving anything."""
     try:
-        photo_url = upload_listing_photo(photo_bytes)
+        return upload_listing_photo(photo_bytes)
     except Exception:
         raise HTTPException(status_code=502, detail=MSG_UPLOAD_FAILED)
+
+
+# ---------- Post a new listing ----------
+
+@router.post("/listings", status_code=201)
+def create_listing(
+    title: str = Form(""),
+    description: str = Form(""),
+    hourly_rate: float = Form(0),
+    condition: str = Form(""),
+    max_duration: int = Form(0),
+    negotiable: bool = Form(False),
+    campus: str = Form(""),
+    photo: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),  # must be logged in; gives us the owner
+):
+    """Create a listing for the logged-in user (lender)."""
+    # 1. Check every field.
+    fields = _check_fields(title, description, hourly_rate, condition, max_duration, campus)
+
+    # 2. Check the photo. For a NEW listing it is required.
+    photo_bytes = photo.file.read() if photo is not None else b""
+    if not photo_bytes:
+        _bad_request(MSG_PHOTO_REQUIRED)
+    _check_photo(photo_bytes)
+
+    # 3. Upload the photo.
+    photo_url = _upload(photo_bytes)
 
     # 4. Save the listing. status and postedat are filled in by the database.
     listing = Listing(
         userid=user.userid,  # from the login token, never from the app
-        title=title,
-        description=description,
         photourl=photo_url,
-        hourlyrate=round(hourly_rate, 2),
-        condition=condition,
-        maxduration=max_duration,
         negotiable=negotiable,
-        campus=campus,
+        **fields,
     )
     db.add(listing)
     db.commit()
     db.refresh(listing)
 
     return {"message": "Listing posted", "data": {"id": listing.listingid, "image_url": photo_url}}
+
+
+# ---------- Edit a listing (SCRUM-24) ----------
+
+@router.put("/listings/{listing_id}")
+def update_listing(
+    listing_id: int,
+    title: str = Form(""),
+    description: str = Form(""),
+    hourly_rate: float = Form(0),
+    condition: str = Form(""),
+    max_duration: int = Form(0),
+    negotiable: bool = Form(False),
+    campus: str = Form(""),
+    photo: Optional[UploadFile] = File(None),  # optional here: no photo = keep the old one
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Edit one of MY listings, only while it is still available."""
+    # 1. Find the listing and check I am allowed to edit it.
+    listing = db.query(Listing).filter(Listing.listingid == listing_id).first()
+    if listing is None:
+        raise HTTPException(status_code=404, detail=MSG_NOT_FOUND)
+    if listing.userid != user.userid:
+        raise HTTPException(status_code=403, detail=MSG_NOT_OWNER)
+    if (listing.status or "available") != "available":
+        raise HTTPException(status_code=409, detail=MSG_NOT_AVAILABLE)
+
+    # 2. Same field checks as create.
+    fields = _check_fields(title, description, hourly_rate, condition, max_duration, campus)
+
+    # 3. New photo only if one was sent.
+    photo_bytes = photo.file.read() if photo is not None else b""
+    if photo_bytes:
+        _check_photo(photo_bytes)
+        listing.photourl = _upload(photo_bytes)
+
+    # 4. Save the changes.
+    for column, value in fields.items():
+        setattr(listing, column, value)
+    listing.negotiable = negotiable
+    db.commit()
+
+    return {"message": "Listing updated", "data": {"id": listing.listingid, "image_url": listing.photourl}}
