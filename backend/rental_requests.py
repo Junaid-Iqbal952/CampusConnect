@@ -17,8 +17,9 @@ from session import get_current_user
 
 router = APIRouter(tags=["rental requests"])
 
-# Values of the Postgres enums. If Supabase uses different words, change them
-# HERE only (they are put straight into the SQL, never user input).
+# Values of the Postgres enums (checked in Supabase: requeststatus = pending /
+# approved / declined). They are put straight into the SQL, never user input.
+# An empty listing status counts as available, same as listings.py.
 REQUEST_PENDING = "pending"
 LISTING_AVAILABLE = "available"
 
@@ -60,7 +61,7 @@ def request_listing(
 
     if listing.userid == user.userid:  # FR-3.2: no renting your own item
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=MSG_OWN_LISTING)
-    if listing.status != LISTING_AVAILABLE:  # already rented out (Active)
+    if (listing.status or LISTING_AVAILABLE) != LISTING_AVAILABLE:  # already rented out (Active)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=MSG_NOT_AVAILABLE)
     if _my_pending_request_id(db, listing_id, user.userid) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=MSG_ALREADY_REQUESTED)
@@ -91,5 +92,5 @@ def request_status(
     return {
         "is_owner": listing.userid == user.userid,
         "already_requested": _my_pending_request_id(db, listing_id, user.userid) is not None,
-        "listing_available": listing.status == LISTING_AVAILABLE,
+        "listing_available": (listing.status or LISTING_AVAILABLE) == LISTING_AVAILABLE,
     }
